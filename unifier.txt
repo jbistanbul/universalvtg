@@ -1,0 +1,341 @@
+Unified Video Query Conversion: Preserve All Semantic Meaning
+
+You are given a sentence describing an event in a video from one of the different datasets.
+
+Your task is to convert it into a unified format that:
+1. Preserves ALL semantic meaning, visual cues, objects, attributes, and agent information
+2. Standardizes the style to a consistent format across all datasets
+3. Maintains the original perspective (first-person if original is first-person, third-person if original is third-person)
+
+## Unified Style Target
+
+The target unified format has these characteristics:
+
+1. **Format**: Descriptive statement (declarative sentence)
+   - All queries should be phrased as complete, descriptive statements
+   - Statements directly describe the event that occurred in the video
+   - This format is optimal for Video Temporal Grounding (VTG) because:
+     * VTG task: "Find when [EVENT] happened"
+     * Statements directly describe the event to locate
+     * More natural for temporal matching than questions
+     * Preserves complete semantic structure (Subject-Verb-Object-Location)
+
+2. **Tense**: Past tense
+   - Use past tense verbs ("was", "were", "did", "put", "took", "cooked", "walked", etc.)
+   - This is natural for describing completed events in a video
+   - Past tense indicates events that have already occurred and can be located temporally
+
+3. **Perspective Preservation**: CRITICAL
+   - **If original is first-person** ("I", "my", "me"): Keep first-person
+   - **If original is third-person** ("the person", "he", "she", "they", "a man", "the woman"): Keep third-person
+   - **Do NOT convert** first-person to third-person or vice versa
+   - Preserve agent identity (woman, child, man, dog, person, etc.)
+
+4. **Completeness**: Complete, grammatically correct sentences
+   - Capitalize the first letter
+   - End with a period (.)
+   - Use proper grammar and punctuation
+   - Avoid incomplete or fragmentary sentences
+   - Structure: Subject (Agent) + Verb (Action) + Object + Modifiers (Location/Attributes)
+
+5. **Visual Grounding**: All information must be visually deducible
+   - The event must be grounded purely in visual evidence from the video
+   - Do NOT require reasoning about intentions, motivations, or external knowledge
+   - All elements (agent, action, object, location) should be visually observable
+
+## Critical Preservation Rules
+
+### 1. Agent/Subject Preservation (CRITICAL)
+- **Preserve the original agent noun phrase exactly**:
+  - "I" → "I" (first-person stays first-person)
+  - "the person" → "the person" (third-person stays third-person)
+  - "a woman" → "a woman" or "the woman" (preserve agent identity)
+  - "he" / "she" → "he" / "she" (preserve gender if specified)
+  - "they" / "two people" → "they" / "two people" (preserve plurality)
+  - "someone" / "a person" → "someone" / "a person" (keep generic if original is generic)
+- **Do NOT convert** between first-person and third-person
+- Agent identity (woman, child, man, dog, etc.) is a strong visual cue that must be preserved
+
+### 2. Action/Verb Preservation (CRITICAL)
+- **Preserve the main verb phrase**:
+  - "doing sit ups" → keep "doing sit ups" (not "doing")
+  - "laying tiles" → keep "laying tiles" (not "laying")
+  - "riding a camel" → keep "riding a camel" (not "riding")
+  - "wax down a ski" → keep "wax down a ski"
+- **Do NOT replace** specific actions with generic verbs like "do/doing" unless the original is already generic
+- The main action is a critical visual cue
+
+### 3. Object Preservation (CRITICAL)
+- **Preserve all key objects** tied to the action:
+  - tiles, ski, ball, mop, camel, wrapping paper, cup, bowl, pan, etc.
+- **Do NOT drop** objects that are part of the visual event
+- Objects are essential visual cues
+
+### 4. Attribute Preservation (CRITICAL)
+- **Preserve important attributes** when present:
+  - "young girl" → keep "young girl" (not just "girl")
+  - "little boy" → keep "little boy" (not just "boy")
+  - "yellow ball" → keep "yellow ball" (not just "ball")
+  - "dog in socks" → keep "dog in socks"
+  - "woman wearing overalls" → keep "woman wearing overalls"
+- Attributes provide important visual information
+
+### 5. Location/Spatial Information Preservation (CRITICAL)
+- **Preserve all location information**:
+  - "inside a gym" → keep location reference
+  - "on the shelf" → keep location reference
+  - "in the sink" → keep location reference
+- Location is a key visual cue
+
+### 6. Temporal Information Handling
+- **Avoid ordinal references** (first, second, third, next, last) unless they can be converted to visually grounded events
+- **Temporal words** ("before", "after", "when", "while") are allowed ONLY if they refer to clearly visible actions
+- Convert ordinal phrases to event-based descriptions:
+  - "second outfit" → "after changing into a different outfit"
+  - "first jump" → "after landing from a jump"
+
+### 7. Question-to-Statement Conversion (CRITICAL)
+- **When converting questions to statements, focus on describing the EVENT/ACTION, not the answer**
+- Do NOT replace question information with generic placeholders like "somewhere", "something", "some number", "some color"
+- **Key principle**: The question is asking to FIND information. The statement should describe the EVENT/ACTION that contains that information, using specific event verbs.
+- **Use event-focused verbs** that describe what happened:
+  - Location questions → use verbs like: positioned, placed, located, situated, appeared, found
+  - Count questions → use verbs like: appeared, encountered, passed, saw, observed (but don't assume "multiple" - the count is unknown)
+  - Attribute questions → use verbs like: displayed, showed, had, featured, exhibited
+  - Action questions → use verbs like: performed, did, executed, engaged in
+- Examples of CORRECT conversions:
+  - "Where was X?" → "X was positioned at a location" or "X was located at a place" (describes the positioning event)
+    ❌ WRONG: "X was somewhere" or "X was at a location" (too vague, no event verb)
+  - "How many X?" → "I passed X" or "X appeared" (describes the passing/appearance event without assuming count)
+    ❌ WRONG: "I passed multiple X" (assumes more than one - we don't know the count)
+    ❌ WRONG: "I passed some number of X" (too vague)
+    Note: Don't assume "multiple" - the count is unknown, just describe the event
+  - "What color was X?" → "X displayed a color" or "X showed a specific color" (describes the display event)
+    ❌ WRONG: "X was some color" or "X had a color" (too vague, no event verb)
+  - "What did X do?" → "X performed an action" or "X engaged in an activity" (describes the performance event)
+    ❌ WRONG: "X did something" (too vague)
+  - "Who was with X?" → "A person accompanied X" or "A person was present with X" (describes the accompaniment event)
+    ❌ WRONG: "Someone was with X" (too vague, no event verb)
+- Focus on the ACTION/EVENT, not just the state
+- Use descriptive event verbs that make the statement more specific and natural
+
+## Statement Structure Guidelines
+
+Statements should follow this structure:
+- **Subject (Agent)**: Who performed the action
+- **Verb (Action)**: What action was performed (past tense)
+- **Object**: What was acted upon (if applicable)
+- **Modifiers**: Location, attributes, manner, etc.
+
+Examples of good statement structures:
+- "[Agent] [action] [object] [location]": "The person cooked food on the stove"
+- "[Agent] [action] [location]": "A woman was standing in the room"
+- "[Agent] [action] [object]": "I put the cup in the drawer"
+- "[Agent] [action] [manner]": "The dog walked slowly onto the floor"
+
+## Disallowed Content
+
+Do NOT include:
+- Reasoning about intentions or motivations ("why" explanations)
+- External knowledge (country names, company names, brand names)
+- Off-screen information that cannot be visually verified
+- References to multiple long-separated segments that cannot be unified
+- Future events or predictions
+- Ordinal references that cannot be converted to visually grounded events
+
+## Example Conversions
+
+### Example 1: Converting Questions to Statements - CRITICAL: Focus on Event Verbs
+
+**IMPORTANT**: When converting questions, focus on describing the EVENT/ACTION using specific event verbs. Do NOT use generic placeholders like "somewhere", "something", "some number", "some color".
+
+1. Original: "What did I put into the plastic bucket?"
+   Converted: "I placed an object into the plastic bucket."
+   OR if the object is known from context: "I placed [specific object] into the plastic bucket."
+   (Uses event verb "placed" - describes the placement event)
+   ❌ WRONG: "I put something into the plastic bucket." (too generic, weak verb)
+
+2. Original: "Where was the soap before I picked it up?"
+   Converted: "The soap was positioned at a location before I picked it up."
+   OR if location is known: "The soap was positioned on the counter before I picked it up."
+   (Uses event verb "positioned" - describes the positioning event)
+   ❌ WRONG: "The soap was somewhere before I picked it up." (lost location, no event verb)
+
+3. Original: "What did I pour in the bowl?"
+   Converted: "I poured a liquid into the bowl."
+   OR if known: "I poured water into the bowl."
+   (Uses event verb "poured" - already describes the pouring event)
+   ✅ GOOD: This one already has a good event verb
+
+4. Original: "Where was the green bucket?"
+   Converted: "The green bucket was positioned at a location."
+   OR if location is visible: "The green bucket was positioned on the floor."
+   (Uses event verb "positioned" - describes the positioning event)
+   ❌ WRONG: "The green bucket was somewhere." (no event verb, too vague)
+
+5. Original: "How many flyovers did I pass?"
+   Converted: "I passed flyovers."
+   (Uses event verb "passed" - describes the passing event without assuming count)
+   ❌ WRONG: "I passed multiple flyovers." (assumes more than one - we don't know the count)
+   ❌ WRONG: "I passed some number of flyovers." (too vague)
+   Note: The question asks "how many" but we don't know the answer, so just describe the event
+
+6. Original: "What color was the traffic sign?"
+   Converted: "The traffic sign displayed a color."
+   OR if visible: "The traffic sign displayed red."
+   (Uses event verb "displayed" - describes the display event)
+   ❌ WRONG: "The traffic sign was some color." (no event verb, too vague)
+
+7. Original: "Who was with me when I poured flour in the pot?"
+   Converted: "A person accompanied me when I poured flour in the pot."
+   (Uses event verb "accompanied" - describes the accompaniment event)
+   ❌ WRONG: "Someone was with me..." (no event verb, too vague)
+
+### Example 2: Converting Present Tense to Past Tense 
+4. Original: "A cook is standing in front of a large stove."
+   Converted: "A cook was standing in front of a large stove."
+   (Preserved: agent "cook", location "in front of a large stove", action "standing"; changed: present → past tense)
+
+5. Original: "A young woman is seen standing in a room and leads into her dancing."
+   Converted: "A young woman was standing in a room and then started dancing."
+   (Preserved: agent "young woman", location "in a room", action sequence; changed: present → past tense, clarified sequence)
+
+6. Original: "A little boy holding a yellow ball walks by."
+   Converted: "A little boy holding a yellow ball walked by."
+   (Preserved: agent "little boy", attribute "little", object "yellow ball", action "walks by"; changed: present → past tense)
+
+### Example 3: Converting Casual to Formal 
+7. Original: "a person cooking on the stove."
+   Converted: "A person was cooking on the stove."
+   (Preserved: agent "person", location "on the stove", action "cooking"; fixed: capitalization, added verb, past tense)
+
+8. Original: "person takes a cup out the fridge."
+   Converted: "A person took a cup out of the fridge."
+   (Preserved: agent "person", object "cup", action "takes out", location "fridge"; fixed: capitalization, grammar, past tense)
+
+9. Original: "person sneezing on a mirror."
+   Converted: "A person was sneezing on a mirror."
+   (Preserved: agent "person", action "sneezing", location "on a mirror"; fixed: capitalization, added verb, past tense)
+
+### Example 4: Converting Mixed Tense 
+10. Original: "He gets a bowl of herbs from the pantry and add some to the eggs in the pan."
+    Converted: "He got a bowl of herbs from the pantry and added some to the eggs in the pan."
+    (Preserved: agent "he", objects "bowl of herbs", "eggs", "pan", location "pantry", action sequence; changed: present → past tense)
+
+11. Original: "He turned on stove"
+    Converted: "He turned on the stove."
+    (Preserved: agent "he", action "turned on", object "stove"; fixed: added article "the", punctuation)
+
+12. Original: "The person dumps the egg yolk into the second cup."
+    Converted: "The person dumped the egg yolk into a different cup after the first one."
+    (Preserved: agent "person", object "egg yolk", action "dumps", location "cup"; changed: present → past tense, converted ordinal "second" to "after the first")
+
+### Example 5: Preserving Complex Information
+13. Original: "A dog in socks walks slowly out onto the floor as a lady films him."
+    Converted: "A dog in socks walked slowly out onto the floor as a lady filmed him."
+    (Preserved: agent "dog", attribute "in socks", action "walks slowly", location "onto the floor", interaction "lady films him"; changed: present → past tense)
+
+14. Original: "The woman serves the fried potatoes with some ketchup and pepper."
+    Converted: "The woman served the fried potatoes with some ketchup and pepper."
+    (Preserved: agent "woman", object "fried potatoes", accompaniments "ketchup and pepper"; changed: present → past tense)
+
+15. Original: "They then wax down a ski in the kitchen while continuing to move around."
+    Converted: "They waxed down a ski in the kitchen while continuing to move around."
+    (Preserved: agent "they", object "ski", action "wax down", location "in the kitchen", context "moving around"; changed: present → past tense)
+
+## Conversion Guidelines
+
+1. **Identify all semantic elements**:
+   - Agent/subject (who)
+   - Action/verb (what happened)
+   - Objects (what was involved)
+   - Location (where)
+   - Attributes (descriptive details)
+   - Temporal relations (when, sequence)
+
+2. **Preserve original perspective**:
+   - First-person stays first-person
+   - Third-person stays third-person
+   - Do NOT convert between perspectives
+
+3. **Convert to statement format**:
+   - Transform questions to descriptive statements
+   - Transform incomplete/casual statements to complete formal statements
+   - Structure: Subject (Agent) + Verb (Action) + Object + Modifiers
+   - **CRITICAL for questions**: When converting questions, focus on describing the EVENT/ACTION using specific event verbs:
+     * "Where was X?" → "X was positioned at a location" (use event verb "positioned")
+     * "What did X do?" → "X performed an action" (use event verb "performed")
+     * "How many X?" → "I passed X" or "X appeared" (use event verbs "passed"/"appeared" without assuming count)
+       Note: Don't assume "multiple" - the count is unknown, just describe the event
+     * "What color was X?" → "X displayed a color" (use event verb "displayed")
+     * "Who was with X?" → "A person accompanied X" (use event verb "accompanied")
+   - **Key principle**: Use specific event verbs that describe what happened, not just state a vague fact
+   - Avoid vague placeholders: "somewhere", "something", "some number", "some color"
+   - Avoid weak verbs: "was", "had", "were" (unless they're part of a compound event description)
+
+4. **Convert to past tense**:
+   - Present tense → past tense
+   - "is/are" → "was/were"
+   - "does/do" → "did" or appropriate past tense verb
+   - "walks" → "walked"
+   - "cooks" → "cooked"
+   - "takes" → "took"
+
+5. **Standardize completeness**:
+   - Capitalize first letter
+   - End with period (.)
+   - Complete incomplete sentences
+   - Fix grammatical errors
+   - Add missing articles (a, an, the) where needed
+
+6. **Preserve all visual information**:
+   - Do NOT drop any objects, attributes, locations, or actions
+   - Do NOT simplify beyond what's necessary for grammar
+   - Every visual cue must be preserved
+   - **CRITICAL**: When converting questions, use event-focused verbs:
+     * ❌ Do NOT use: "somewhere", "something", "some number", "some color", "someone" (unless original is generic)
+     * ❌ Do NOT use weak verbs: "was", "had", "were" alone (they don't describe events)
+     * ✅ Instead use event verbs: "positioned", "placed", "appeared", "displayed", "performed", "encountered", "accompanied"
+   - Focus on describing the EVENT/ACTION, not just stating a vague fact
+   - If a question asks about information not in the original, use event verbs to describe what happened (e.g., "X was positioned at a location" not "X was somewhere")
+
+7. **Handle temporal/ordinal references**:
+   - Convert ordinals to event-based descriptions
+   - Ensure temporal words refer to visible events
+   - Maintain temporal sequence when present
+
+## Output Requirements
+
+For each input sentence, provide ONLY the converted statement. Do NOT include:
+- The original sentence
+- Explanations
+- Multiple alternatives
+- Any commentary
+
+The output should be a single, complete statement in the unified format that preserves all semantic meaning from the original.
+
+## Quality Checklist
+
+Before outputting, verify:
+- ✓ All agent/subject information preserved
+- ✓ All actions/verbs preserved
+- ✓ All objects preserved
+- ✓ All attributes preserved
+- ✓ All location information preserved
+- ✓ Original perspective maintained (first-person or third-person)
+- ✓ Converted to past tense
+- ✓ Converted to statement format (declarative sentence)
+- ✓ Complete, grammatically correct sentence
+- ✓ Ends with period (.)
+- ✓ Proper capitalization
+- ✓ No loss of semantic meaning
+- ✓ No loss of visual cues
+
+## Rationale for Statement Format
+
+The statement format is chosen as the unified format because:
+1. **Directness for VTG**: Video Temporal Grounding requires finding "when [EVENT] happened" - statements directly describe the event
+2. **Semantic Completeness**: Statements naturally preserve Subject-Verb-Object-Location structure
+3. **Model Training**: Consistent statement structure helps models learn patterns
+4. **Naturalness**: Statements are natural for describing events that occurred
+5. **Information Preservation**: Statements allow all semantic elements to be expressed clearly

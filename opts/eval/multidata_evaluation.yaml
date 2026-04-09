@@ -1,0 +1,110 @@
+eval:
+  # List of validation datasets
+  datasets:
+    # Per-dataset iou_threshs: optional, falls back to global iou_threshs below if omitted
+    - name: goalstep
+      iou_threshs: [0.3, 0.5]          # dataset-specific IoU thresholds
+      batchify_text_queries: false       # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: val
+        anno_file: # path/to/goalstep_annotations.json
+        vid_feat_dir: # path/to/goalstep_video_features
+        text_feat_dir: # path/to/goalstep_text_features
+        ext_score_dir: null
+        max_vid_len: 35584
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1      # downsampling stride for video features
+        to_fixed_len: false     # whether to resize video to fixed length
+
+    - name: ego4d
+      iou_threshs: [0.3, 0.5]          # dataset-specific IoU thresholds
+      batchify_text_queries: true       # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: val
+        anno_file: # path/to/ego4d_annotations.json
+        vid_feat_dir: # path/to/ego4d_video_features
+        text_feat_dir: # path/to/ego4d_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 4608
+        max_text_len: 24
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+    
+    - name: tacos
+      iou_threshs: [0.3, 0.5]    # dataset-specific IoU thresholds
+      batchify_text_queries: false # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: test
+        anno_file: # path/to/tacos_annotations.json
+        vid_feat_dir: # path/to/tacos_video_features
+        text_feat_dir: # path/to/tacos_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 2304
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+
+    - name: charades-sta
+      iou_threshs: [0.5, 0.7]    # dataset-specific IoU thresholds
+      batchify_text_queries: true # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: test
+        anno_file: # path/to/charades_sta_annotations.json
+        vid_feat_dir: # path/to/charades_sta_video_features
+        text_feat_dir: # path/to/charades_sta_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 512
+        max_text_len: 20
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        
+    - name: anet1.3
+      iou_threshs: [0.5, 0.7]    # dataset-specific IoU thresholds
+      batchify_text_queries: true # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: val_2
+        anno_file: # path/to/anet_annotations.json
+        vid_feat_dir: # path/to/anet_video_features
+        text_feat_dir: # path/to/anet_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 512
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+  primary_dataset: average
+
+  ranks: [1, 5]
+  iou_threshs: [0.3, 0.5, 0.7]
+
+  pre_nms_topk: 2000
+  pre_nms_thresh: 0.001
+  seg_len_thresh: 0.1
+  max_text_len: 36
+  batchify_text_queries: false
+
+  nms:
+    mode: soft_nms
+    iou_thresh: 0.1
+    min_score: 0.001
+    max_num_segs: 5
+    sigma: 0.9
+    voting_thresh: 0.95

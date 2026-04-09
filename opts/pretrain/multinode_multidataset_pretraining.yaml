@@ -1,0 +1,367 @@
+# ============================================================================
+# Multi-Dataset Training Configuration (8-node multi-node)
+# ============================================================================
+# This config trains on multiple datasets simultaneously and validates on each
+# dataset separately, reporting per-dataset metrics.
+#
+# Usage:
+#   python train_multinode.py --opt video_centric/multi_dataset_traineval_multinode_8node_ego4dv2_iouthresh.yaml --name <experiment_name>
+#
+# Requirements:
+#   - Set meta.trainer_type to TrainerMultiDatasetMultiNode (additive multi-node path)
+#   - Use train.datasets (list) instead of train.data
+#   - Use eval.datasets (list) instead of eval.data
+#   - Set eval.primary_dataset for best model selection
+# ============================================================================
+# Note:
+#   - Dataset-specific eval IoU thresholds are cloned from:
+#     legacy internal config reference removed for release clarity
+
+model_net: 
+  name: hieramamba
+
+meta:
+  trainer_type: TrainerMultiDatasetMultiNode  # Additive multi-node trainer (LOCAL_RANK-safe DDP)
+  evaluator_type: EvaluatorAuxiliary
+
+model:
+  early_fusion: true
+  use_mst: false
+  
+  text_net:
+    name: identity
+    in_dim: 1024
+    embd_dim: 512
+    n_heads: 4
+    max_seq_len: 36
+    use_abs_pe: false
+    use_bkgd_token: true
+    
+  vid_net:
+    name: hieramamba_backbone
+    in_dim: 1024
+    embd_dim: 512
+    n_heads: 4
+    max_seq_len: 4608       # Use max of all datasets
+    arch: [2, 0, 8]
+    mha_win_size: 0
+    attn_pdrop: 0.0
+    proj_pdrop: 0.1
+    path_pdrop: 0.1
+    use_abs_pe: true
+    pool_method: 'mean'
+    block_type: 'AnchorMambaPoolingBlockGated'
+    ffn_ratio: 2    
+    return_anchor: true
+    local_encode: true
+    local_encoder_type: 'transformer'
+    local_window_size: 5
+    local_encode_num_layers: 0
+    mamba_headdim: 64
+    mamba_dstate: 64
+    mamba_expand: 2
+    mamba_dconv: 7
+
+  fusion:
+    name: xattn
+    n_layers: 2
+    n_heads: 4
+    attn_pdrop: 0.0
+    proj_pdrop: 0.1
+    path_pdrop: 0.1
+    xattn_mode: adaln
+    
+  cls_head:
+    name: cls
+    n_layers: 2
+    prior_prob: 0.0
+
+  reg_head:
+    name: reg
+    n_layers: 2
+
+pt_gen:
+  regression_range: 4
+  sigma: 0.5
+
+# =========================================================================
+# TRAINING CONFIGURATION - Multiple Datasets
+# =========================================================================
+train:
+  # List of training datasets
+  datasets:
+    - name: NaQ
+      data:
+        name: video_centric
+        split: train
+        anno_file: # path/to/naq_annotations.json
+        vid_feat_dir: # path/to/naq_video_features
+        text_feat_dir: # path/to/naq_text_features
+        ext_score_dir: null
+        max_vid_len: 4608
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        crop_ratio: null #[0.9, 1.0]
+        max_num_text: 2
+    
+    - name: HiREST
+      data:
+        name: video_centric
+        split: train
+        anno_file: # path/to/hirest_annotations.json
+        vid_feat_dir: # path/to/hirest_video_features
+        text_feat_dir: # path/to/hirest_text_features
+        ext_score_dir: null
+        max_vid_len: 4608
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        crop_ratio: null #[0.9, 1.0]
+        max_num_text: 2
+
+    - name: Moment-GESM
+      data:
+        name: video_centric
+        split: train
+        anno_file: # path/to/moment_gesm_annotations.json
+        vid_feat_dir: # path/to/moment_gesm_video_features
+        text_feat_dir: # path/to/moment_gesm_text_features
+        ext_score_dir: null
+        max_vid_len: 4608
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        crop_ratio: null 
+        max_num_text: 2
+
+    - name: COIN
+      data:
+        name: video_centric
+        split: train
+        anno_file: # path/to/coin_annotations.json
+        vid_feat_dir: # path/to/coin_video_features
+        text_feat_dir: # path/to/coin_text_features
+        ext_score_dir: null
+        max_vid_len: 4608
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        crop_ratio: null 
+        max_num_text: 2
+
+    - name: YouCook2
+      data:
+        name: video_centric
+        split: train
+        anno_file: # path/to/youcook2_annotations.json
+        vid_feat_dir: # path/to/youcook2_video_features
+        text_feat_dir: # path/to/youcook2_text_features
+        ext_score_dir: null
+        max_vid_len: 2304
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        crop_ratio: null 
+        max_num_text: 2
+
+  batch_size: 8 # Per-GPU batch stays fixed (global batch scales with WORLD_SIZE)
+  num_workers: 32
+
+  # LR policy: kept fixed for stability during first 8-node rollout; tune after smoke/full run.
+  epochs: 14
+  warmup_epochs: 1
+  ema_beta: 0.999
+
+  center_sampling: radius
+  center_sampling_radius: 1.5
+
+  loss_norm: 10
+  loss_weight: 1.0
+  reg_loss: iou
+  
+  loss_aux:
+    ds_contrast:
+      enable: true
+      type: ds_contrastive
+      contr_type: contr_mp
+      weight: 100.0
+      radius: 0
+      neg_ratio: 8
+      gap_ratio: 0.2
+      temperature: 0.07
+      proj_outdim: 256
+      proj_expand: 1.0
+      proj_num_layers: 2
+      hard_neg: false
+      cross_video_neg: false
+    gt_contrast:
+      enable: true
+      type: gt_point_contrastive
+      contr_type: point_gt_contr_pooled
+      weight: 10.0
+      neg_ratio: 1.0
+      temperature: 0.07
+      use_projector: true
+      proj_expand: 1.0
+      proj_outdim: 256
+      proj_num_layers: 2
+      span_radius: 1.5
+      span_contr_gt: false
+
+  optimizer:
+    name: adamw
+    lr: 1.e-3  # intentionally fixed (no linear scaling in first rollout)
+    weight_decay: 0.05
+  clip_grad_norm: 1.0
+
+  scheduler:
+    name: multistep
+    steps: [9, 13]
+
+  # Validation settings
+  validation:
+    enable: true
+    val_every: 1  # keep every epoch in multi-node baseline
+    patience: -1              # -1 = disabled, set positive for early stopping
+    metric: "mIoU"
+    batch_size: 4
+    num_workers: 16
+
+  # Optional: load from pretrained checkpoint
+  pretrain_checkpoint: null #./experiments/0_naq_pretrain_v1_mnt8b64_lr001/models/best.pth
+
+# =========================================================================
+# EVALUATION CONFIGURATION - Multiple Datasets
+# =========================================================================
+eval:
+  # List of validation datasets
+  datasets:
+    # Per-dataset iou_threshs: optional, falls back to global iou_threshs below if omitted
+    - name: goalstep
+      iou_threshs: [0.3, 0.5]          # dataset-specific IoU thresholds
+      batchify_text_queries: false       # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: val
+        anno_file: # path/to/goalstep_annotations.json
+        vid_feat_dir: # path/to/goalstep_video_features
+        text_feat_dir: # path/to/goalstep_text_features
+        ext_score_dir: null
+        max_vid_len: 35584
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1      # downsampling stride for video features
+        to_fixed_len: false     # whether to resize video to fixed length
+
+    - name: ego4d
+      iou_threshs: [0.3, 0.5]          # dataset-specific IoU thresholds
+      batchify_text_queries: true       # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: val
+        anno_file: # path/to/ego4d_annotations.json
+        vid_feat_dir: # path/to/ego4d_video_features
+        text_feat_dir: # path/to/ego4d_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 4608
+        max_text_len: 24
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+    
+    - name: tacos
+      iou_threshs: [0.3, 0.5]    # dataset-specific IoU thresholds
+      batchify_text_queries: true # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: test
+        anno_file: # path/to/tacos_annotations.json
+        vid_feat_dir: # path/to/tacos_video_features
+        text_feat_dir: # path/to/tacos_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 2304
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+
+    - name: charades-sta
+      iou_threshs: [0.5, 0.7]    # dataset-specific IoU thresholds
+      batchify_text_queries: true # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: test
+        anno_file: # path/to/charades_sta_annotations.json
+        vid_feat_dir: # path/to/charades_sta_video_features
+        text_feat_dir: # path/to/charades_sta_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 512
+        max_text_len: 20
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+        
+    - name: anet1.3
+      iou_threshs: [0.5, 0.7]    # dataset-specific IoU thresholds
+      batchify_text_queries: true # dataset-specific batchify_text_queries
+      data:
+        name: video_centric
+        split: val_2
+        anno_file: # path/to/anet_annotations.json
+        vid_feat_dir: # path/to/anet_video_features
+        text_feat_dir: # path/to/anet_text_features
+        ext_score_dir: null
+        
+        max_vid_len: 512
+        max_text_len: 36
+        clip_size: 15
+        clip_stride: 15
+        downsample_rate: 1
+        to_fixed_len: false
+
+
+  # Which dataset to use for best model selection
+  # Options: specific dataset name (e.g., "ego4d") or "average"
+  primary_dataset: average
+
+  ranks: [1]
+  iou_threshs: [0.3, 0.5, 0.7]
+
+  pre_nms_topk: 2000
+  pre_nms_thresh: 0.001
+  seg_len_thresh: 0.1
+  max_text_len: 36
+  batchify_text_queries: true
+
+  nms:
+    mode: soft_nms
+    iou_thresh: 0.1
+    min_score: 0.001
+    max_num_segs: 5
+    sigma: 0.9
+    voting_thresh: 0.95
+
+# =========================================================================
+# LOGGING
+# =========================================================================
+log:
+  log_interval: 200  # reduce log pressure at 8-node scale
+  checkpoint_epochs: [-1]  # keep last only; avoid frequent heavy checkpointing

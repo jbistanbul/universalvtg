@@ -1,0 +1,20 @@
+# Core VTG runtime
+numpy>=1.21.0
+PyYAML
+termcolor
+tensorboard
+tqdm
+
+# HieraMamba runtime
+mamba-ssm>=2.2.3
+causal-conv1d>=1.2.0
+einops>=0.5.0
+
+# Feature extraction + Perception Encoder import-time deps
+Pillow>=10.0.0
+decord==0.6.0
+transformers>=4.48.0
+ftfy
+regex
+huggingface_hub
+timm>=1.0.0

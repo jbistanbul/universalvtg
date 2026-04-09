@@ -1,0 +1,3 @@
+[submodule "perception_models"]
+	path = perception_models
+	url = https://github.com/facebookresearch/perception_models
