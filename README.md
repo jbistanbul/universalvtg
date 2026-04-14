@@ -30,7 +30,7 @@ See [INSTALL.md](INSTALL.md) for full setup instructions including environment c
 
 ```bash
 git clone --recurse-submodules https://github.com/jbistanbul/universalvtg.git
-cd universal_vtg
+cd universalvtg
 conda env create -f environment.yml
 conda activate universal_vtg_release
 bash install.sh
@@ -126,7 +126,7 @@ The `original/` folders contain the unmodified annotations for each benchmark. T
 
 Download: [[Features (UT Box)](https://utexas.box.com/s/l9zm74v2wkljjaz35nmf9idhysjr5bc1)]
 
-Pre-extracted visual and text features for all supported datasets:
+Pre-extracted visual and text features (Unified texts using Unifier with GPT5) for all supported datasets:
 
 ```
 data/
@@ -239,7 +239,7 @@ This codebase builds on [HieraMamba](https://github.com/jbistanbul/hieramamba). 
 ## Citation
 If you find UniversalVTG useful for your research and applications, please consider giving a star ⭐ and citing using the following BibTeX:
 ```bibtex
-@article{an2025universalvtg,
+@article{an2026universalvtg,
   title={UniversalVTG: A Universal and Lightweight Foundation Model for Video Temporal Grounding},
   author={An, Joungbin and Jain, Agrim and Grauman, Kristen},
   journal={arXiv preprint arXiv:2604.08522},
