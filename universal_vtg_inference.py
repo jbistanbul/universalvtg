@@ -6,13 +6,28 @@ This module provides a clean, easy-to-use interface for UniversalVTG model infer
 Features are expected at 2 fps with clip_size=15, clip_stride=15, downsample_rate=1.
 Text and video encoding via PerceptionEncoder (PE-Core-L14-336) is built in.
 
+Important:
+    - UniversalVTG defaults to the release feature contract:
+      ``feature_fps=2.0`` plus the feature length to produce timestamps
+      in seconds.
+    - If you know the original/source video FPS, you can still pass it
+      via ``fps`` for a more explicit source-time conversion path.
+
 Usage (raw features):
     model = UniversalVTG()
-    results = model.predict(vid_features, text_features, fps=2.0, duration=300.0)
+    results = model.predict(
+        vid_features,
+        text_features,
+        feature_fps=2.0,
+    )
 
 Usage (raw text string — auto-encodes with PE):
     model = UniversalVTG()
-    results = model.predict(vid_features, "a person cooking on the stove", fps=2.0, duration=300.0)
+    results = model.predict(
+        vid_features,
+        "a person cooking on the stove",
+        feature_fps=2.0,
+    )
 
 Usage (end-to-end from video file):
     model = UniversalVTG()
@@ -54,6 +69,10 @@ class UniversalVTG:
     Features are expected at 2 fps with clip_size=15, clip_stride=15,
     and downsample_rate=1. Text and video encoding via PerceptionEncoder
     is built in — you can pass raw strings or video paths directly.
+
+    By default, timestamp conversion follows the release feature contract
+    (`feature_fps=2.0` plus feature length). If the original/source video
+    FPS is known, you can pass it explicitly via ``fps``.
     """
 
     def __init__(self, experiment_name='experiments/universalvtg',
@@ -579,7 +598,8 @@ class UniversalVTG:
     @torch.no_grad()
     def predict(self, vid_features, text_features, vid_mask=None, text_mask=None,
                 top_k=None, score_thresh=None, return_raw=False,
-                fps=FEATURES_FPS, duration=None, use_unifier: Optional[bool] = None,
+                fps=None, duration=None, feature_fps=FEATURES_FPS,
+                use_unifier: Optional[bool] = None,
                 return_query_info: bool = True):
         """
         Predict temporal segments given video and text features.
@@ -593,11 +613,16 @@ class UniversalVTG:
             top_k: Number of top predictions (default from opt).
             score_thresh: Min score threshold (default from opt).
             return_raw: Return raw predictions without NMS.
-            fps: Feature extraction FPS for timestamp conversion
-                 (default: 2.0, matching the extraction rate).
+            fps: Original/source video FPS used for timestamp conversion.
+                 This is optional when using the release feature contract
+                 (features extracted at ``feature_fps`` with the fixed
+                 clip geometry). If ``None``, timestamps are derived from
+                 ``feature_fps`` instead.
             duration: Video duration in seconds for clamping. If ``None``,
-                      automatically computed as ``T / fps`` from the
+                      automatically computed as ``T / feature_fps`` from the
                       video feature length.
+            feature_fps: Feature extraction FPS for ``vid_features``.
+                         Defaults to the release extraction rate (2.0).
             use_unifier: Whether to canonicalize raw string queries before
                          PE encoding. Only supported for a single raw string.
             return_query_info: Whether to attach ``query_info`` metadata for
@@ -638,7 +663,10 @@ class UniversalVTG:
 
         # Auto-compute duration from feature length if not provided
         if duration is None:
-            duration = vid_len / fps
+            duration = vid_len / feature_fps
+
+        if feature_fps <= 0:
+            raise ValueError("feature_fps must be positive")
 
         if vid_mask is None:
             vid_mask = torch.ones(
@@ -748,17 +776,17 @@ class UniversalVTG:
                     nms_segments_list.append(torch.zeros(0, 2, device=self.device))
                     nms_scores_list.append(torch.zeros(0, device=self.device))
 
-            if fps is not None:
-                for i in range(len(nms_segments_list)):
-                    if len(nms_segments_list[i]) > 0:
-                        nms_segments_list[i] = (
-                            nms_segments_list[i] * self.vid_stride
-                            * self.clip_stride + 0.5 * self.clip_size
-                        ) / fps
-                        if duration is not None:
-                            nms_segments_list[i] = torch.clamp(
-                                nms_segments_list[i], min=0, max=duration,
-                            )
+            for i in range(len(nms_segments_list)):
+                if len(nms_segments_list[i]) > 0:
+                    nms_segments_list[i] = self._convert_segments_to_seconds(
+                        nms_segments_list[i],
+                        fps=fps,
+                        feature_fps=feature_fps,
+                    )
+                    if duration is not None:
+                        nms_segments_list[i] = torch.clamp(
+                            nms_segments_list[i], min=0, max=duration,
+                        )
 
             return {
                 'segments': nms_segments_list,
@@ -784,11 +812,12 @@ class UniversalVTG:
                 nms_segments = torch.zeros(0, 2, device=self.device)
                 nms_scores = torch.zeros(0, device=self.device)
 
-            if len(nms_segments) > 0 and fps is not None:
-                nms_segments = (
-                    nms_segments * self.vid_stride
-                    * self.clip_stride + 0.5 * self.clip_size
-                ) / fps
+            if len(nms_segments) > 0:
+                nms_segments = self._convert_segments_to_seconds(
+                    nms_segments,
+                    fps=fps,
+                    feature_fps=feature_fps,
+                )
                 if duration is not None:
                     nms_segments = torch.clamp(nms_segments, min=0, max=duration)
 
@@ -836,7 +865,8 @@ class UniversalVTG:
             vid_features, query,
             top_k=top_k,
             score_thresh=score_thresh,
-            fps=FEATURES_FPS,
+            fps=video_fps,
+            feature_fps=FEATURES_FPS,
             duration=duration,
             use_unifier=use_unifier,
         )
@@ -845,6 +875,25 @@ class UniversalVTG:
         results['duration'] = duration
         results['query'] = query
         return results
+
+    def _convert_segments_to_seconds(self, segments: torch.Tensor, *, fps: float | None, feature_fps: float) -> torch.Tensor:
+        """Convert decoded segment coordinates into seconds.
+
+        If ``fps`` is provided, use the original/raw-video FPS conversion.
+        Otherwise, fall back to the release feature-time contract:
+
+            raw_fps = feature_fps * clip_stride
+
+        which yields:
+
+            seconds = (segment * vid_stride + 0.5 * clip_size / clip_stride) / feature_fps
+        """
+        segments = segments * self.vid_stride
+        if fps is not None:
+            return (segments * self.clip_stride + 0.5 * self.clip_size) / fps
+
+        clip_center_offset = 0.5 * (self.clip_size / self.clip_stride)
+        return (segments + clip_center_offset) / feature_fps
 
     # ------------------------------------------------------------------
     # Internal helpers

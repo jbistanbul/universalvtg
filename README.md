@@ -41,10 +41,6 @@ bash install.sh
 The `UniversalVTG` class provides a simple, self-contained inference API.
 Load the model once, then call `predict` or `predict_video` with any combination of inputs.
 
-The model operates on visual features extracted at **2 FPS** (the default extraction rate).
-FPS and duration are handled automatically — predictions are always returned in seconds.
-Duration is estimated from the feature length; for more accurate clamping, you can pass `duration` (in seconds) explicitly.
-
 Before running, download the pretrained checkpoint and place it under the expected path:
 
 ```
@@ -56,7 +52,7 @@ experiments/universalvtg/
 
 Download: [[Checkpoint (UT Box)](https://utexas.box.com/s/vm52tyvfqxhrnmnswm4kbe8cr1fkke6e)]
 
-### Pre-extracted video & text features
+### Running on pre-extracted video & text features
 
 ```python
 import torch
@@ -67,10 +63,13 @@ model = UniversalVTG()  # loads checkpoint from experiments/universalvtg/
 vid_features = torch.load("video_features.pt")    # (feature_dim, T)
 text_features = torch.load("text_features.pt")     # (feature_dim, L)
 
-results = model.predict(vid_features, text_features)
+results = model.predict(
+    vid_features,
+    text_features
+)
 ```
 
-### Video features + raw text query (auto-encodes text via Perception Encoder)
+### Running on video features + raw text query (auto-encodes text via Perception Encoder)
 
 ```python
 import torch
@@ -79,17 +78,49 @@ from universal_vtg_inference import UniversalVTG
 model = UniversalVTG()
 
 vid_features = torch.load("video_features.pt")     # (feature_dim, T)
-results = model.predict(vid_features, "a person cooking on the stove")
+results = model.predict(
+    vid_features,
+    "a person cooking on the stove"
+)
 ```
 
-### End-to-end from video file + raw text query (auto-encodes both)
+### Running end-to-end from video file + raw text query (auto-encodes both)
 
 ```python
 from universal_vtg_inference import UniversalVTG
 
 model = UniversalVTG()
 results = model.predict_video("cooking.mp4", "a person cooking on the stove")
+
+# predict_video() extracts features at 2 FPS internally and uses the
+# source video's native FPS for timestamp conversion automatically.
 ```
+
+### Optional: pass the source/original video FPS explicitly
+
+If you know the original/source video FPS and want to provide it explicitly:
+
+```python
+results = model.predict(
+    vid_features,
+    "a person cooking on the stove",
+    fps=30.0,
+    feature_fps=2.0,
+)
+```
+
+The model operates on visual features extracted at **2 FPS** (the default extraction rate).
+If you call `predict(...)` without providing extra timing metadata, UniversalVTG defaults to using:
+
+- `feature_fps=2.0`
+- the feature length
+
+to convert predictions into timestamps in seconds.
+
+If you have the original/source video FPS, you can still pass it via `fps` for a more explicit source-time conversion path.
+
+If `duration` is omitted, it is estimated automatically from the feature length and `feature_fps`.
+You can optionally provide `duration` for more accurate clamping, but it is not required in the common case.
 
 ### Output format
 
@@ -126,7 +157,7 @@ The `original/` folders contain the unmodified annotations for each benchmark. T
 
 Download: [[Features (UT Box)](https://utexas.box.com/s/l9zm74v2wkljjaz35nmf9idhysjr5bc1)]
 
-Pre-extracted visual and text features (Unified texts using Unifier with GPT5) for all supported datasets:
+Pre-extracted visual and text features (unified queries using Unifier with GPT5) for all supported datasets:
 
 ```
 data/
